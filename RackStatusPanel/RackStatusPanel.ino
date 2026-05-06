@@ -1,50 +1,91 @@
-// NeoPixel Ring simple sketch (c) 2013 Shae Erisson
-// Released under the GPLv3 license to match the rest of the
-// Adafruit NeoPixel library
+#define PIN        D4 
+#define NUMPIXELS 28 
+#define DEVICE_COUNT 4
+#define METRIC_COUNT 4
+#define UPDATE_INTERVAL 500
+
+#define START_INDEX_MET 0
+#define START_INDEX_A 4
+#define START_INDEX_DEV 14
+#define START_INDEX_B 18
 
 #include <Adafruit_NeoPixel.h>
-#ifdef __AVR__
- #include <avr/power.h> // Required for 16 MHz Adafruit Trinket
-#endif
 
-// Which pin on the Arduino is connected to the NeoPixels?
-#define PIN        D4 // On Trinket or Gemma, suggest changing this to 1
-
-// How many NeoPixels are attached to the Arduino?
-#define NUMPIXELS 28 
-
-// When setting up the NeoPixel library, we tell it how many pixels,
-// and which pin to use to send signals. Note that for older NeoPixel
-// strips you might need to change the third parameter -- see the
-// strandtest example for more information on possible values.
 Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
 
-#define DELAYVAL 500 // Time (in milliseconds) to pause between pixels
+uint8_t status[DEVICE_COUNT][METRIC_COUNT * 2] = {};
+
+int sel_device = 0;
+int sel_metric = 0;
+
+long lastUpdate = millis();
+
+void init_status() {
+  for(int d; d < DEVICE_COUNT; d++){
+    for(int m; m < METRIC_COUNT * 2; m += 2){
+      status[d][m] = 50;
+      status[d][m+1] = 30;
+    }
+  }
+}
+void set_metrics() {
+  if(millis() - lastUpdate < UPDATE_INTERVAL) return;
+  Serial.println("uptade");
+
+  for(int d = 0; d < DEVICE_COUNT; d++){
+    for(int m = 0; m < METRIC_COUNT * 2; m += 2){
+      status[d][m] = (uint8_t)random(0, 100);
+      status[d][m+1] = (uint8_t)random(0, 100);
+    }
+  }
+  lastUpdate = millis();
+}
+
+void display_selection(){
+  pixels.setPixelColor(START_INDEX_DEV + sel_device, pixels.Color(25, 0, 0));
+  pixels.setPixelColor(START_INDEX_MET + sel_metric, pixels.Color(25, 0, 0));
+}
+void display_value(int start, uint8_t value) {
+  Serial.print(start);
+  Serial.println(value);
+  for(int i = 0; i < 10; i++) {
+    if(value >= 10 + 10*i && i < 7) pixels.setPixelColor(start + i, pixels.Color(0, 25, 0));
+    if(value >= 70 && i >= 7 && i <= 8) pixels.setPixelColor(start + i, pixels.Color(25, 25, 0));
+    if(value >= 90 && i == 9) pixels.setPixelColor(start + i, pixels.Color(25, 0, 0));
+  }
+}
+void display_metrics() {
+  display_value(START_INDEX_A, status[sel_device][sel_metric]);
+  display_value(START_INDEX_B, status[sel_device][sel_metric + 1]);
+}
+
+void checkButtonPressed() {
+  
+}
 
 void setup() {
-  // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
-  // Any other board, you can remove this part (but no harm leaving it):
-#if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
-  clock_prescale_set(clock_div_1);
-#endif
-  // END of Trinket-specific code.
-
-  pixels.begin(); // INITIALIZE NeoPixel strip object (REQUIRED)
+  pixels.begin();
+  init_status();
+  Serial.begin(9600);
 }
 
 void loop() {
-  pixels.clear(); // Set all pixel colors to 'off'
+  
+  // check for changes in status
+  set_metrics();
+  
+  // check for button presses
+  sel_metric++;
+  if(sel_metric >= METRIC_COUNT) sel_device++;
+  sel_metric = sel_metric % METRIC_COUNT;
+  sel_device = sel_device % DEVICE_COUNT;
 
-  // The first NeoPixel in a strand is #0, second is 1, all the way up
-  // to the count of pixels minus one.
-  for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
+  pixels.clear();
 
-    // pixels.Color() takes RGB values, from 0,0,0 up to 255,255,255
-    // Here we're using a moderately bright green color:
-    pixels.setPixelColor(i, pixels.Color(i*10, 0, 0));
+  display_selection();
+  display_metrics();
 
-    pixels.show();   // Send the updated pixel colors to the hardware.
-
-    delay(DELAYVAL); // Pause before next pass through loop
-  }
+  // display values
+  pixels.show();
+  delay(1000);
 }
