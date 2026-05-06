@@ -1,4 +1,7 @@
 #define PIN        D4 
+#define BTN_MET_PIN D3
+#define BTN_DEV_PIN D2
+
 #define NUMPIXELS 28 
 #define DEVICE_COUNT 4
 #define METRIC_COUNT 4
@@ -23,14 +26,13 @@ long lastUpdate = millis();
 void init_status() {
   for(int d; d < DEVICE_COUNT; d++){
     for(int m; m < METRIC_COUNT * 2; m += 2){
-      status[d][m] = 50;
-      status[d][m+1] = 30;
+      status[d][m] = (uint8_t)30;
+      status[d][m+1] = (uint8_t)35;
     }
   }
 }
 void set_metrics() {
   if(millis() - lastUpdate < UPDATE_INTERVAL) return;
-  Serial.println("uptade");
 
   for(int d = 0; d < DEVICE_COUNT; d++){
     for(int m = 0; m < METRIC_COUNT * 2; m += 2){
@@ -46,8 +48,6 @@ void display_selection(){
   pixels.setPixelColor(START_INDEX_MET + sel_metric, pixels.Color(25, 0, 0));
 }
 void display_value(int start, uint8_t value) {
-  Serial.print(start);
-  Serial.println(value);
   for(int i = 0; i < 10; i++) {
     if(value >= 10 + 10*i && i < 7) pixels.setPixelColor(start + i, pixels.Color(0, 25, 0));
     if(value >= 70 && i >= 7 && i <= 8) pixels.setPixelColor(start + i, pixels.Color(25, 25, 0));
@@ -59,26 +59,41 @@ void display_metrics() {
   display_value(START_INDEX_B, status[sel_device][sel_metric + 1]);
 }
 
+bool btn_dev_pressed = false;
+bool btn_met_pressed = false;
+
 void checkButtonPressed() {
-  
+  if(digitalRead(BTN_MET_PIN) == LOW && !btn_met_pressed) {
+    btn_met_pressed = true;
+    
+    sel_metric++;
+    sel_metric = sel_metric % METRIC_COUNT;
+  } else if (digitalRead(BTN_MET_PIN) == HIGH) {
+    btn_met_pressed = false;
+  }
+
+  if(digitalRead(BTN_DEV_PIN) == LOW && !btn_dev_pressed) {
+    btn_dev_pressed = true;
+    
+    sel_device++;
+    sel_device = sel_device % DEVICE_COUNT;
+  } else if (digitalRead(BTN_DEV_PIN) == HIGH) {
+    btn_dev_pressed = false;
+  }
 }
 
 void setup() {
   pixels.begin();
   init_status();
-  Serial.begin(9600);
+
+  pinMode(BTN_MET_PIN, INPUT_PULLUP);
+  pinMode(BTN_DEV_PIN, INPUT_PULLUP);
 }
 
 void loop() {
-  
-  // check for changes in status
   set_metrics();
   
-  // check for button presses
-  sel_metric++;
-  if(sel_metric >= METRIC_COUNT) sel_device++;
-  sel_metric = sel_metric % METRIC_COUNT;
-  sel_device = sel_device % DEVICE_COUNT;
+  checkButtonPressed();
 
   pixels.clear();
 
@@ -87,5 +102,4 @@ void loop() {
 
   // display values
   pixels.show();
-  delay(1000);
 }
